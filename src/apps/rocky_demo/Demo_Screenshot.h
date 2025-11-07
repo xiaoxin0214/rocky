@@ -46,7 +46,7 @@ namespace
         VkFormat depthFormat)
     {
         auto colorAttachment = vsg::defaultColorAttachment(imageFormat);
-		colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR; // VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+        colorAttachment.finalLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
 
         auto depthAttachment = vsg::defaultDepthAttachment(depthFormat);
 		depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -255,7 +255,10 @@ static void screenshot(rocky::VSGContext&ctx, vsg::ref_ptr<vsg::Image> sourceIma
 		}
 	}
 
-	vsg::write(imageData, filename, ctx->readerWriterOptions);
+	if (!vsg::write(imageData, filename, ctx->readerWriterOptions))
+	{
+		Log()->warn("Failed to write screenshot image data. Possible reasons: invalid path, no write permission, or unsupported format.");
+	}
 }
 
 auto Demo_Screenshot = [](Application& app)
@@ -275,10 +278,15 @@ auto Demo_Screenshot = [](Application& app)
         auto vp = main_view->camera->getViewport();
 
         auto device = main_window->getDevice();
-		VkExtent2D extent{ vp.width, vp.height };
+		VkExtent2D extent{ static_cast<uint32_t>(vp.width), static_cast<uint32_t>(vp.height) };
 
         offscreenRenderGraph = vsg::RenderGraph::create();
         offscreenRenderGraph->framebuffer = createFramebuffer(device, extent);
+		offscreenRenderGraph->renderArea.extent = offscreenRenderGraph->framebuffer->extent2D();
+		offscreenRenderGraph->setClearValues(
+			VkClearColorValue{ {0.0f, 0.0f, 0.0f, 1.0f} },
+			VkClearDepthStencilValue{ 0.0f, 0 });
+
         offscreenRenderGraph->addChild(main_view);
 
         auto install = [&app, main_window]()
@@ -298,7 +306,7 @@ auto Demo_Screenshot = [](Application& app)
         return;
     }
 
-	static char filenameBuffer[512] = "D:/screenshot.png";
+	static char filenameBuffer[512] = "D:\\screenshot.jpg";
 	ImGui::Text("Save Path:");
 	ImGui::SameLine();
 	ImGui::InputText("##Save Path", filenameBuffer, sizeof(filenameBuffer));
